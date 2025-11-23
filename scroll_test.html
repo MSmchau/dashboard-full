@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>滚动测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #e8f4fd;
+            border-left: 4px solid #2196F3;
+            border-radius: 4px;
+        }
+        .test-card {
+            background: #fff;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .scrollable-content {
+            height: 200px;
+            overflow-y: auto;
+            background: #fafafa;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .data-item {
+            padding: 8px 12px;
+            margin: 4px 0;
+            background: white;
+            border-radius: 3px;
+            border-left: 3px solid #4CAF50;
+        }
+        .scroll-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #2196F3;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="scroll-indicator" id="scrollIndicator">滚动位置: 0%</div>
+    
+    <div class="test-container">
+        <h1>Dashboard 滚动功能测试</h1>
+        <p>此页面用于验证滚动条修复效果。包含足够的测试内容以确保页面可以正常滚动。</p>
+        
+        <!-- 生成测试段落 -->
+        <div id="testSections"></div>
+        
+        <!-- 生成测试卡片 -->
+        <div id="testCards"></div>
+        
+        <!-- 滚动测试容器 -->
+        <div class="scrollable-content" id="scrollTest">
+            <h3>可滚动内容区域</h3>
+            <div id="dataItems"></div>
+        </div>
+        
+        <!-- 底部测试内容 -->
+        <div class="test-section">
+            <h2>底部测试区域</h2>
+            <p>这是页面底部的内容。如果你能看到这部分，说明页面滚动功能正常工作。</p>
+            <p>滚动位置: <span id="scrollPosition">0</span></p>
+        </div>
+    </div>
+
+    <script>
+        // 生成15个测试段落
+        const testSectionsContainer = document.getElementById('testSections');
+        for (let i = 1; i <= 15; i++) {
+            const section = document.createElement('div');
+            section.className = 'test-section';
+            section.innerHTML = `
+                <h3>测试段落 ${i}</h3>
+                <p>这是第${i}个测试段落，用于创建足够的页面高度以测试滚动功能。
+                内容包含Lorem ipsum dolor sit amet, consectetur adipiscing elit. 
+                Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+            `;
+            testSectionsContainer.appendChild(section);
+        }
+        
+        // 生成5个测试卡片
+        const testCardsContainer = document.getElementById('testCards');
+        for (let i = 1; i <= 5; i++) {
+            const card = document.createElement('div');
+            card.className = 'test-card';
+            card.innerHTML = `
+                <h4>测试卡片 ${i}</h4>
+                <p>卡片内容 ${i} - 包含测试数据和数据可视化组件</p>
+                <div style="background: #e8f5e8; padding: 10px; margin: 10px 0; border-radius: 4px;">
+                    数值: ${Math.round(Math.random() * 1000)}
+                </div>
+            `;
+            testCardsContainer.appendChild(card);
+        }
+        
+        // 生成20个数据项到可滚动容器
+        const dataItemsContainer = document.getElementById('dataItems');
+        for (let i = 1; i <= 20; i++) {
+            const item = document.createElement('div');
+            item.className = 'data-item';
+            item.textContent = `数据项 ${i}: ${Math.round(Math.random() * 1000)}`;
+            dataItemsContainer.appendChild(item);
+        }
+        
+        // 滚动事件监听
+        function updateScrollInfo() {
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const scrollPercent = Math.round((scrollTop / docHeight) * 100);
+            
+            document.getElementById('scrollIndicator').textContent = `滚动位置: ${scrollPercent}%`;
+            document.getElementById('scrollPosition').textContent = scrollPercent;
+        }
+        
+        // 可滚动容器的滚动事件
+        document.getElementById('scrollTest').addEventListener('scroll', function() {
+            const scrollTop = this.scrollTop;
+            const scrollHeight = this.scrollHeight - this.clientHeight;
+            const scrollPercent = Math.round((scrollTop / scrollHeight) * 100);
+            console.log('可滚动容器滚动位置:', scrollPercent + '%');
+        });
+        
+        // 页面滚动事件
+        window.addEventListener('scroll', updateScrollInfo);
+        
+        // 页面加载完成后更新滚动信息
+        window.addEventListener('load', updateScrollInfo);
+        
+        console.log('滚动测试页面已加载完成');
+        console.log('测试内容生成: 15个段落, 5个卡片, 1个滚动容器(20个数据项)');
+    </script>
+</body>
+</html>

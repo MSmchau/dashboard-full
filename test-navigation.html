@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>导航功能测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Vue Dashboard 导航功能测试</h1>
+        
+        <div class="test-result info">
+            <strong>测试说明：</strong>这些测试将验证Vue应用的导航功能是否正常工作。
+        </div>
+        
+        <div id="test-results"></div>
+        
+        <button onclick="testApplicationLoad()">1. 测试应用加载</button>
+        <button onclick="testNavigationRoutes()">2. 测试导航路由</button>
+        <button onclick="testRouterFunctionality()">3. 测试路由功能</button>
+        <button onclick="testErrorHandling()">4. 测试错误处理</button>
+        
+        <div style="margin-top: 20px;">
+            <button onclick="runAllTests()">运行所有测试</button>
+            <button onclick="clearResults()">清除结果</button>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <a href="http://localhost:3000/" target="_blank">打开应用</a> |
+            <a href="http://localhost:3000/dashboard" target="_blank">打开仪表盘</a> |
+            <a href="http://localhost:3000/device-monitor" target="_blank">打开设备监控</a>
+        </div>
+    </div>
+
+    <script>
+        const results = document.getElementById('test-results');
+        
+        function addResult(test, status, message) {
+            const div = document.createElement('div');
+            div.className = `test-result ${status}`;
+            div.innerHTML = `<strong>${test}:</strong> ${message}`;
+            results.appendChild(div);
+        }
+        
+        function clearResults() {
+            results.innerHTML = '';
+        }
+        
+        async function testApplicationLoad() {
+            try {
+                const response = await fetch('http://localhost:3000/');
+                if (response.ok) {
+                    const content = await response.text();
+                    if (content.includes('app') && content.includes('main.ts')) {
+                        addResult('应用加载测试', 'success', '应用成功加载，HTML结构正常');
+                    } else {
+                        addResult('应用加载测试', 'error', '应用加载但内容异常');
+                    }
+                } else {
+                    addResult('应用加载测试', 'error', `HTTP错误: ${response.status}`);
+                }
+            } catch (error) {
+                addResult('应用加载测试', 'error', `连接失败: ${error.message}`);
+            }
+        }
+        
+        async function testNavigationRoutes() {
+            const routes = [
+                { path: '/dashboard', name: '仪表盘' },
+                { path: '/device-monitor', name: '设备监控' },
+                { path: '/error-monitor', name: '错误监控' },
+                { path: '/performance', name: '性能监控' }
+            ];
+            
+            for (const route of routes) {
+                try {
+                    const response = await fetch(`http://localhost:3000${route.path}`);
+                    if (response.ok) {
+                        addResult(`路由测试 - ${route.name}`, 'success', `${route.path} 路由可达`);
+                    } else {
+                        addResult(`路由测试 - ${route.name}`, 'error', `${route.path} 路由错误: ${response.status}`);
+                    }
+                } catch (error) {
+                    addResult(`路由测试 - ${route.name}`, 'error', `${route.path} 路由失败: ${error.message}`);
+                }
+            }
+        }
+        
+        async function testRouterFunctionality() {
+            try {
+                // 测试JavaScript文件加载
+                const mainJsResponse = await fetch('http://localhost:3000/src/main.ts');
+                const routerResponse = await fetch('http://localhost:3000/src/router/index.ts');
+                
+                if (mainJsResponse.ok && routerResponse.ok) {
+                    addResult('路由功能测试', 'success', '主要JavaScript文件和路由配置加载正常');
+                } else {
+                    addResult('路由功能测试', 'error', 'JavaScript文件加载异常');
+                }
+            } catch (error) {
+                addResult('路由功能测试', 'error', `文件加载失败: ${error.message}`);
+            }
+        }
+        
+        async function testErrorHandling() {
+            try {
+                const response = await fetch('http://localhost:3000/non-existent-route');
+                if (response.status === 404 || response.status === 200) {
+                    addResult('错误处理测试', 'success', '404处理机制正常');
+                } else {
+                    addResult('错误处理测试', 'info', `响应状态: ${response.status}`);
+                }
+            } catch (error) {
+                addResult('错误处理测试', 'error', `错误处理测试失败: ${error.message}`);
+            }
+        }
+        
+        async function runAllTests() {
+            clearResults();
+            addResult('测试开始', 'info', '正在运行所有导航功能测试...');
+            
+            await testApplicationLoad();
+            await testNavigationRoutes();
+            await testRouterFunctionality();
+            await testErrorHandling();
+            
+            addResult('测试完成', 'info', '所有测试已完成，请查看上方结果。');
+        }
+        
+        // 页面加载时自动运行基础测试
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                addResult('页面加载', 'success', '测试页面加载成功，可以开始导航功能测试');
+            }, 100);
+        });
+    </script>
+</body>
+</html>

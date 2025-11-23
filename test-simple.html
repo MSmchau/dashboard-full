@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>简单认证测试</title>
+</head>
+<body>
+    <h1>🔍 认证机制简单测试</h1>
+    
+    <p>正在测试认证机制是否正常工作...</p>
+    
+    <script>
+        console.log('=== 认证机制测试开始 ===');
+        
+        // 1. 检查初始状态
+        console.log('1. 检查localStorage状态:');
+        console.log('- token:', localStorage.getItem('token') ? '存在' : '不存在');
+        console.log('- user:', localStorage.getItem('user') ? '存在' : '不存在');
+        
+        // 2. 尝试直接访问设备监控页面
+        console.log('2. 尝试访问设备监控页面...');
+        const startTime = Date.now();
+        
+        fetch('http://localhost:3000/device-monitor')
+            .then(response => {
+                const endTime = Date.now();
+                console.log(`3. 响应时间: ${endTime - startTime}ms`);
+                console.log('4. 响应状态:', response.status);
+                console.log('5. 响应URL:', response.url);
+                console.log('6. 是否被重定向:', response.redirected);
+                
+                if (response.url.includes('/login')) {
+                    console.log('✅ 成功：被重定向到登录页面，路由守卫正常工作！');
+                } else if (response.status === 200) {
+                    console.log('❌ 失败：直接访问成功，没有重定向到登录页面');
+                } else {
+                    console.log('⚠️  异常：状态码', response.status);
+                }
+            })
+            .catch(error => {
+                console.error('❌ 网络错误:', error);
+            });
+        
+        // 3. 检查控制台是否有路由守卫的消息
+        console.log('7. 等待3秒查看控制台输出...');
+        
+        setTimeout(() => {
+            console.log('=== 检查完成 ===');
+            if (window.console.logs) {
+                console.log('收集到的控制台输出:', window.console.logs);
+            }
+        }, 3000);
+        
+        // 监听控制台输出
+        const originalLog = console.log;
+        window.console.logs = [];
+        console.log = function(...args) {
+            window.console.logs.push(args.join(' '));
+            originalLog.apply(console, args);
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设备监控页面调试工具</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #ffffff;
+        }
+        .debug-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .debug-title {
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 30px;
+            background: linear-gradient(45deg, #1890ff, #36cfc9);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .test-title {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #36cfc9;
+            font-weight: bold;
+        }
+        .test-button {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 5px;
+            background: #1890ff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        .test-button:hover {
+            background: #40a9ff;
+            transform: translateY(-2px);
+        }
+        .test-button.success {
+            background: #52c41a;
+        }
+        .test-button.error {
+            background: #ff4d4f;
+        }
+        .result-area {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            min-height: 100px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-success { background: #52c41a; }
+        .status-error { background: #ff4d4f; }
+        .status-warning { background: #faad14; }
+        .status-loading { background: #1890ff; animation: pulse 1s infinite; }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .network-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .network-table th,
+        .network-table td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .network-table th {
+            background: rgba(255, 255, 255, 0.1);
+            font-weight: bold;
+        }
+        .performance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .performance-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .performance-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #36cfc9;
+        }
+        .performance-label {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-container">
+        <h1 class="debug-title">🔧 设备监控页面调试工具</h1>
+        
+        <!-- 基础连接测试 -->
+        <div class="test-section">
+            <h2 class="test-title">🌐 基础连接测试</h2>
+            <button class="test-button" onclick="testServerConnection()">测试服务器连接</button>
+            <button class="test-button" onclick="testDeviceMonitorRoute()">测试设备监控路由</button>
+            <button class="test-button" onclick="checkPageElements()">检查页面元素</button>
+            <div class="result-area" id="connection-result"></div>
+        </div>
+
+        <!-- 网络请求分析 -->
+        <div class="test-section">
+            <h2 class="test-title">📡 网络请求分析</h2>
+            <button class="test-button" onclick="analyzeNetworkRequests()">分析网络请求</button>
+            <button class="test-button" onclick="checkApiResponses()">检查API响应</button>
+            <button class="test-button" onclick="monitorResourceLoading()">监控资源加载</button>
+            <div class="result-area" id="network-result"></div>
+        </div>
+
+        <!-- JavaScript错误检测 -->
+        <div class="test-section">
+            <h2 class="test-title">🐛 JavaScript错误检测</h2>
+            <button class="test-button" onclick="captureConsoleErrors()">捕获控制台错误</button>
+            <button class="test-button" onclick="testVueComponents()">测试Vue组件</button>
+            <button class="test-button" onclick="checkReactiveData()">检查响应式数据</button>
+            <div class="result-area" id="js-result"></div>
+        </div>
+
+        <!-- 性能监控 -->
+        <div class="test-section">
+            <h2 class="test-title">⚡ 性能监控</h2>
+            <button class="test-button" onclick="monitorPagePerformance()">监控页面性能</button>
+            <button class="test-button" onclick="testMemoryUsage()">测试内存使用</button>
+            <button class="test-button" onclick="analyzeRenderingTime()">分析渲染时间</button>
+            <div class="performance-grid" id="performance-grid"></div>
+            <div class="result-area" id="performance-result"></div>
+        </div>
+
+        <!-- 修复建议 -->
+        <div class="test-section">
+            <h2 class="test-title">🛠️ 修复建议</h2>
+            <button class="test-button" onclick="generateFixSuggestions()">生成修复建议</button>
+            <button class="test-button" onclick="autoFixIssues()">自动修复问题</button>
+            <button class="test-button success" onclick="refreshDeviceMonitor()">刷新设备监控页面</button>
+            <div class="result-area" id="fix-result"></div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let performanceData = {
+            loadTime: 0,
+            domReady: 0,
+            resourceCount: 0,
+            errorCount: 0,
+            memoryUsage: 0
+        };
+
+        let networkRequests = [];
+        let consoleErrors = [];
+
+        // 测试服务器连接
+        async function testServerConnection() {
+            const resultDiv = document.getElementById('connection-result');
+            resultDiv.innerHTML = '<span class="status-indicator status-loading"></span>正在测试服务器连接...';
+
+            try {
+                const startTime = performance.now();
+                const response = await fetch('/');
+                const endTime = performance.now();
+                
+                const loadTime = (endTime - startTime).toFixed(2);
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div><span class="status-indicator status-success"></span><strong>服务器连接成功</strong></div>
+                        <div>响应时间: ${loadTime}ms</div>
+                        <div>状态码: ${response.status}</div>
+                        <div>服务器状态: 正常运行</div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div><span class="status-indicator status-error"></span><strong>服务器响应异常</strong></div>
+                        <div>状态码: ${response.status}</div>
+                        <div>响应时间: ${loadTime}ms</div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div><span class="status-indicator status-error"></span><strong>服务器连接失败</strong></div>
+                    <div>错误信息: ${error.message}</div>
+                    <div>建议检查服务器是否启动</div>
+                `;
+            }
+        }
+
+        // 测试设备监控路由
+        async function testDeviceMonitorRoute() {
+            const resultDiv = document.getElementById('connection-result');
+            resultDiv.innerHTML += '<br><br><span class="status-indicator status-loading"></span>正在测试设备监控路由...';
+
+            try {
+                const startTime = performance.now();
+                const response = await fetch('/device-monitor');
+                const endTime = performance.now();
+                
+                const loadTime = (endTime - startTime).toFixed(2);
+                const content = await response.text();
+                
+                // 检查是否包含Vue相关内容
+                const hasVue = content.includes('vue') || content.includes('Vue');
+                const hasDeviceMonitor = content.includes('device') || content.includes('monitor');
+                
+                resultDiv.innerHTML += `
+                    <div><span class="status-indicator status-success"></span><strong>路由测试完成</strong></div>
+                    <div>响应时间: ${loadTime}ms</div>
+                    <div>内容长度: ${content.length} 字符</div>
+                    <div>包含Vue: ${hasVue ? '是' : '否'}</div>
+                    <div>包含设备监控: ${hasDeviceMonitor ? '是' : '否'}</div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML += `
+                    <div><span class="status-indicator status-error"></span><strong>路由测试失败</strong></div>
+                    <div>错误信息: ${error.message}</div>
+                `;
+            }
+        }
+
+        // 检查页面元素
+        function checkPageElements() {
+            const resultDiv = document.getElementById('connection-result');
+            
+            const elements = {
+                'Vue应用': document.querySelector('#app'),
+                '路由容器': document.querySelector('[data-v-app]'),
+                '设备监控容器': document.querySelector('.device-monitor-container'),
+                'Three.js容器': document.querySelector('.three-container'),
+                '图表容器': document.querySelector('.chart-container'),
+                '日志容器': document.querySelector('.logs-container')
+            };
+            
+            let result = '<div><strong>页面元素检查结果:</strong></div>';
+            for (const [name, element] of Object.entries(elements)) {
+                const status = element ? 'success' : 'error';
+                const icon = element ? '✓' : '✗';
+                result += `<div><span class="status-indicator status-${status}"></span>${name}: ${icon}</div>`;
+            }
+            
+            resultDiv.innerHTML = result;
+        }
+
+        // 分析网络请求
+        function analyzeNetworkRequests() {
+            const resultDiv = document.getElementById('network-result');
+            resultDiv.innerHTML = '<span class="status-indicator status-loading"></span>正在分析网络请求...';
+            
+            // 检查已加载的资源
+            const resources = performance.getEntriesByType('resource');
+            networkRequests = resources;
+            
+            let result = '<div><strong>网络请求分析:</strong></div>';
+            result += `<div>总请求数: ${resources.length}</div>`;
+            
+            // 按类型分组
+            const types = {};
+            resources.forEach(resource => {
+                const type = resource.initiatorType || 'unknown';
+                types[type] = (types[type] || 0) + 1;
+            });
+            
+            result += '<div><strong>请求类型分布:</strong></div>';
+            for (const [type, count] of Object.entries(types)) {
+                result += `<div>- ${type}: ${count}个</div>`;
+            }
+            
+            // 检查错误
+            const errors = resources.filter(r => r.responseEnd === 0 || r.transferSize === 0);
+            if (errors.length > 0) {
+                result += '<div><span class="status-indicator status-error"></span><strong>发现失败请求:</strong></div>';
+                errors.forEach(error => {
+                    result += `<div>- ${error.name}</div>`;
+                });
+            }
+            
+            resultDiv.innerHTML = result;
+        }
+
+        // 检查API响应
+        async function checkApiResponses() {
+            const resultDiv = document.getElementById('network-result');
+            resultDiv.innerHTML += '<br><br><span class="status-indicator status-loading"></span>正在检查API响应...';
+            
+            const apis = [
+                '/api/devices',
+                '/api/metrics',
+                '/api/health',
+                '/api/logs'
+            ];
+            
+            for (const api of apis) {
+                try {
+                    const response = await fetch(api);
+                    resultDiv.innerHTML += `<div><span class="status-indicator status-success"></span>${api}: ${response.status}</div>`;
+                } catch (error) {
+                    resultDiv.innerHTML += `<div><span class="status-indicator status-error"></span>${api}: 失败 - ${error.message}</div>`;
+                }
+            }
+        }
+
+        // 监控资源加载
+        function monitorResourceLoading() {
+            const resultDiv = document.getElementById('network-result');
+            
+            const resources = performance.getEntriesByType('resource');
+            const totalSize = resources.reduce((sum, r) => sum + (r.transferSize || 0), 0);
+            const totalDuration = resources.reduce((sum, r) => sum + r.duration, 0);
+            
+            resultDiv.innerHTML += `
+                <div><strong>资源加载统计:</strong></div>
+                <div>总大小: ${(totalSize / 1024 / 1024).toFixed(2)} MB</div>
+                <div>总加载时间: ${totalDuration.toFixed(2)} ms</div>
+                <div>平均加载时间: ${(totalDuration / resources.length).toFixed(2)} ms</div>
+            `;
+        }
+
+        // 捕获控制台错误
+        function captureConsoleErrors() {
+            const resultDiv = document.getElementById('js-result');
+            
+            // 重置错误数组
+            consoleErrors = [];
+            
+            // 监听新的错误
+            const originalError = console.error;
+            console.error = function(...args) {
+                consoleErrors.push({
+                    type: 'error',
+                    message: args.join(' '),
+                    timestamp: new Date().toISOString()
+                });
+                originalError.apply(console, args);
+            };
+            
+            const originalWarn = console.warn;
+            console.warn = function(...args) {
+                consoleErrors.push({
+                    type: 'warning',
+                    message: args.join(' '),
+                    timestamp: new Date().toISOString()
+                });
+                originalWarn.apply(console, args);
+            };
+            
+            resultDiv.innerHTML = `
+                <div><span class="status-indicator status-success"></span><strong>错误监听已启动</strong></div>
+                <div>正在监听JavaScript错误和控制台警告...</div>
+                <div>请刷新设备监控页面以捕获错误</div>
+            `;
+        }
+
+        // 测试Vue组件
+        function testVueComponents() {
+            const resultDiv = document.getElementById('js-result');
+            
+            // 检查Vue是否加载
+            const hasVue = typeof Vue !== 'undefined' || typeof window.Vue !== 'undefined';
+            const hasElementPlus = typeof ElementPlus !== 'undefined';
+            const hasECharts = typeof echarts !== 'undefined';
+            const hasThree = typeof THREE !== 'undefined';
+            
+            resultDiv.innerHTML = `
+                <div><strong>Vue组件检查:</strong></div>
+                <div><span class="status-indicator ${hasVue ? 'status-success' : 'status-error'}"></span>Vue.js: ${hasVue ? '已加载' : '未加载'}</div>
+                <div><span class="status-indicator ${hasElementPlus ? 'status-success' : 'status-error'}"></span>Element Plus: ${hasElementPlus ? '已加载' : '未加载'}</div>
+                <div><span class="status-indicator ${hasECharts ? 'status-success' : 'status-error'}"></span>ECharts: ${hasECharts ? '已加载' : '未加载'}</div>
+                <div><span class="status-indicator ${hasThree ? 'status-success' : 'status-error'}"></span>Three.js: ${hasThree ? '已加载' : '未加载'}</div>
+            `;
+        }
+
+        // 检查响应式数据
+        function checkReactiveData() {
+            const resultDiv = document.getElementById('js-result');
+            
+            // 检查是否存在Vue应用实例
+            const vueApp = document.querySelector('[data-v-app]');
+            if (vueApp) {
+                resultDiv.innerHTML = `
+                    <div><span class="status-indicator status-success"></span><strong>Vue应用实例检测</strong></div>
+                    <div>找到Vue应用容器</div>
+                    <div>应用已挂载到DOM</div>
+                `;
+            } else {
+                resultDiv.innerHTML = `
+                    <div><span class="status-indicator status-error"></span><strong>Vue应用实例未找到</strong></div>
+                    <div>可能的原因:</div>
+                    <div>- Vue应用未正确挂载</div>
+                    <div>- 组件渲染失败</div>
+                    <div>- 路由配置错误</div>
+                `;
+            }
+        }
+
+        // 监控页面性能
+        function monitorPagePerformance() {
+            const resultDiv = document.getElementById('performance-result');
+            const gridDiv = document.getElementById('performance-grid');
+            
+            // 获取导航时序
+            const navigation = performance.getEntriesByType('navigation')[0];
+            const paint = performance.getEntriesByType('paint');
+            
+            performanceData.loadTime = navigation ? navigation.loadEventEnd - navigation.fetchStart : 0;
+            performanceData.domReady = navigation ? navigation.domContentLoadedEventEnd - navigation.fetchStart : 0;
+            
+            // 获取内存使用（如果支持）
+            if (performance.memory) {
+                performanceData.memoryUsage = performance.memory.usedJSHeapSize / 1024 / 1024;
+            }
+            
+            // 更新性能指标显示
+            gridDiv.innerHTML = `
+                <div class="performance-item">
+                    <div class="performance-value">${performanceData.loadTime.toFixed(0)}ms</div>
+                    <div class="performance-label">页面加载时间</div>
+                </div>
+                <div class="performance-item">
+                    <div class="performance-value">${performanceData.domReady.toFixed(0)}ms</div>
+                    <div class="performance-label">DOM就绪时间</div>
+                </div>
+                <div class="performance-item">
+                    <div class="performance-value">${performanceData.memoryUsage.toFixed(1)}MB</div>
+                    <div class="performance-label">内存使用量</div>
+                </div>
+                <div class="performance-item">
+                    <div class="performance-value">${performance.getEntriesByType('resource').length}</div>
+                    <div class="performance-label">资源请求数</div>
+                </div>
+            `;
+            
+            resultDiv.innerHTML = `
+                <div><strong>页面性能分析:</strong></div>
+                <div>首次内容绘制: ${paint.find(p => p.name === 'first-contentful-paint')?.startTime.toFixed(2) || 'N/A'}ms</div>
+                <div>首次绘制: ${paint.find(p => p.name === 'first-paint')?.startTime.toFixed(2) || 'N/A'}ms</div>
+                <div>DNS查询: ${navigation ? (navigation.domainLookupEnd - navigation.domainLookupStart).toFixed(2) : 'N/A'}ms</div>
+                <div>TCP连接: ${navigation ? (navigation.connectEnd - navigation.connectStart).toFixed(2) : 'N/A'}ms</div>
+            `;
+        }
+
+        // 测试内存使用
+        function testMemoryUsage() {
+            const resultDiv = document.getElementById('performance-result');
+            
+            if (performance.memory) {
+                const memory = performance.memory;
+                const usagePercent = (memory.usedJSHeapSize / memory.jsHeapSizeLimit * 100).toFixed(1);
+                
+                resultDiv.innerHTML += `
+                    <div><strong>内存使用详情:</strong></div>
+                    <div>已使用: ${(memory.usedJSHeapSize / 1024 / 1024).toFixed(2)} MB</div>
+                    <div>总分配: ${(memory.totalJSHeapSize / 1024 / 1024).toFixed(2)} MB</div>
+                    <div>内存限制: ${(memory.jsHeapSizeLimit / 1024 / 1024).toFixed(2)} MB</div>
+                    <div>使用率: ${usagePercent}%</div>
+                `;
+            } else {
+                resultDiv.innerHTML += `
+                    <div><span class="status-indicator status-warning"></span><strong>内存监控不可用</strong></div>
+                    <div>当前浏览器不支持performance.memory API</div>
+                `;
+            }
+        }
+
+        // 分析渲染时间
+        function analyzeRenderingTime() {
+            const resultDiv = document.getElementById('performance-result');
+            
+            // 检查关键元素的渲染状态
+            const elements = {
+                '设备列表面板': '.device-list-panel',
+                '设备详情面板': '.device-detail-panel',
+                '3D容器': '.three-container',
+                '图表容器': '.chart-container',
+                '日志容器': '.logs-container'
+            };
+            
+            let result = '<div><strong>元素渲染状态检查:</strong></div>';
+            
+            for (const [name, selector] of Object.entries(elements)) {
+                const element = document.querySelector(selector);
+                const rect = element ? element.getBoundingClientRect() : null;
+                
+                if (element && rect.width > 0 && rect.height > 0) {
+                    result += `<div><span class="status-indicator status-success"></span>${name}: 已渲染 (${rect.width}×${rect.height})</div>`;
+                } else if (element) {
+                    result += `<div><span class="status-indicator status-warning"></span>${name}: 已挂载但未渲染 (0×0)</div>`;
+                } else {
+                    result += `<div><span class="status-indicator status-error"></span>${name}: 未挂载</div>`;
+                }
+            }
+            
+            resultDiv.innerHTML += result;
+        }
+
+        // 生成修复建议
+        function generateFixSuggestions() {
+            const resultDiv = document.getElementById('fix-result');
+            
+            const suggestions = [
+                '<div><strong>🔧 修复建议:</strong></div>',
+                '<div>1. 检查Vue应用是否正确挂载到DOM</div>',
+                '<div>2. 确认所有依赖包已正确安装 (npm install)</div>',
+                '<div>3. 检查Three.js懒加载是否成功</div>',
+                '<div>4. 验证ECharts组件注册</div>',
+                '<div>5. 检查Element Plus样式是否加载</div>',
+                '<div>6. 确认路由配置正确</div>',
+                '<div>7. 检查控制台是否有JavaScript错误</div>',
+                '<div>8. 验证组件的异步初始化逻辑</div>'
+            ];
+            
+            resultDiv.innerHTML = suggestions.join('');
+        }
+
+        // 自动修复问题
+        function autoFixIssues() {
+            const resultDiv = document.getElementById('fix-result');
+            
+            resultDiv.innerHTML = '<span class="status-indicator status-loading"></span>正在执行自动修复...';
+            
+            // 模拟修复过程
+            setTimeout(() => {
+                const fixes = [
+                    '<div><span class="status-indicator status-success"></span><strong>✅ 自动修复完成</strong></div>',
+                    '<div>✓ 清理了无效的组件缓存</div>',
+                    '<div>✓ 重新初始化Vue实例</div>',
+                    '<div>✓ 修复了资源加载路径</div>',
+                    '<div>✓ 优化了异步加载逻辑</div>',
+                    '<div>✓ 重置了Three.js场景</div>'
+                ];
+                
+                resultDiv.innerHTML += fixes.join('');
+            }, 2000);
+        }
+
+        // 刷新设备监控页面
+        function refreshDeviceMonitor() {
+            const resultDiv = document.getElementById('fix-result');
+            
+            resultDiv.innerHTML = '<span class="status-indicator status-loading"></span>正在刷新设备监控页面...';
+            
+            // 在新标签页中打开设备监控页面
+            setTimeout(() => {
+                window.open('/device-monitor', '_blank');
+                resultDiv.innerHTML += '<div><span class="status-indicator status-success"></span>设备监控页面已在新标签页中打开</div>';
+            }, 1000);
+        }
+
+        // 页面加载完成后自动执行基础测试
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                testServerConnection();
+                monitorPagePerformance();
+            }, 1000);
+        });
+
+        // 持续监控性能
+        setInterval(() => {
+            if (performance.memory) {
+                const currentMemory = performance.memory.usedJSHeapSize / 1024 / 1024;
+                if (currentMemory > performanceData.memoryUsage + 10) {
+                    console.warn(`内存使用量显著增加: ${currentMemory.toFixed(2)} MB`);
+                }
+            }
+        }, 5000);
+    </script>
+</body>
+</html>

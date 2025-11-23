@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Device Monitor 调试页面</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .debug-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .success {
+            background-color: #e8f5e8;
+            color: #2e7d32;
+            border: 1px solid #4caf50;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+            border: 1px solid #f44336;
+        }
+        .info {
+            background-color: #e3f2fd;
+            color: #1565c0;
+            border: 1px solid #2196f3;
+        }
+        button {
+            background-color: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #1976d2;
+        }
+        .network-test {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-container">
+        <h1>🔍 Device Monitor 页面调试工具</h1>
+        
+        <div class="test-section">
+            <h2>1. 基础连接测试</h2>
+            <button onclick="testBasicConnection()">测试基础连接</button>
+            <div id="connection-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>2. 网络请求测试</h2>
+            <div class="network-test">
+                <button onclick="testAPIEndpoints()">测试API接口</button>
+                <button onclick="testStaticAssets()">测试静态资源</button>
+            </div>
+            <div id="network-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>3. JavaScript错误检测</h2>
+            <button onclick="testJSErrors()">检测JS错误</button>
+            <div id="js-error-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>4. 页面元素检测</h2>
+            <button onclick="testPageElements()">检测页面元素</button>
+            <div id="elements-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>5. 性能监控</h2>
+            <button onclick="startPerformanceMonitor()">开始性能监控</button>
+            <button onclick="stopPerformanceMonitor()">停止监控</button>
+            <div id="performance-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>6. 修复建议</h2>
+            <div id="repair-suggestions"></div>
+        </div>
+    </div>
+
+    <script>
+        let performanceInterval;
+
+        // 测试基础连接
+        async function testBasicConnection() {
+            const result = document.getElementById('connection-result');
+            result.innerHTML = '<div class="test-result info">正在测试...</div>';
+            
+            try {
+                const response = await fetch('/device-monitor', {
+                    method: 'HEAD',
+                    headers: {'Cache-Control': 'no-cache'}
+                });
+                
+                if (response.ok) {
+                    result.innerHTML = `
+                        <div class="test-result success">
+                            ✅ 页面可正常访问 (${response.status})
+                        </div>
+                    `;
+                } else {
+                    result.innerHTML = `
+                        <div class="test-result error">
+                            ❌ 页面访问异常 (${response.status})
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                result.innerHTML = `
+                    <div class="test-result error">
+                        ❌ 页面无法访问: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // 测试API接口
+        async function testAPIEndpoints() {
+            const result = document.getElementById('network-result');
+            result.innerHTML = '<div class="test-result info">正在测试API接口...</div>';
+            
+            const endpoints = [
+                '/api/devices',
+                '/api/metrics',
+                '/api/health'
+            ];
+            
+            let results = '';
+            
+            for (const endpoint of endpoints) {
+                try {
+                    const response = await fetch(endpoint);
+                    results += `
+                        <div class="test-result ${response.ok ? 'success' : 'error'}">
+                            ${response.ok ? '✅' : '❌'} ${endpoint} - ${response.status}
+                        </div>
+                    `;
+                } catch (error) {
+                    results += `
+                        <div class="test-result error">
+                            ❌ ${endpoint} - 无法连接: ${error.message}
+                        </div>
+                    `;
+                }
+            }
+            
+            result.innerHTML = results;
+        }
+
+        // 测试静态资源
+        async function testStaticAssets() {
+            const result = document.getElementById('network-result');
+            result.innerHTML += '<div class="test-result info">正在测试静态资源...</div>';
+            
+            const assets = [
+                '/src/main.ts',
+                '/src/views/DeviceMonitor.vue',
+                '/src/assets/logo.png'
+            ];
+            
+            let results = '';
+            
+            for (const asset of assets) {
+                try {
+                    const response = await fetch(asset);
+                    results += `
+                        <div class="test-result ${response.ok ? 'success' : 'error'}">
+                            ${response.ok ? '✅' : '❌'} ${asset} - ${response.status}
+                        </div>
+                    `;
+                } catch (error) {
+                    results += `
+                        <div class="test-result error">
+                            ❌ ${asset} - 无法加载: ${error.message}
+                        </div>
+                    `;
+                }
+            }
+            
+            result.innerHTML += results;
+        }
+
+        // 检测JavaScript错误
+        function testJSErrors() {
+            const result = document.getElementById('js-error-result');
+            
+            // 重置错误捕获
+            const originalError = window.onerror;
+            const errors = [];
+            
+            window.onerror = function(msg, url, line, col, error) {
+                errors.push({
+                    message: msg,
+                    source: url,
+                    line: line,
+                    column: col,
+                    stack: error ? error.stack : 'N/A'
+                });
+                return false;
+            };
+            
+            // 等待2秒收集错误
+            setTimeout(() => {
+                window.onerror = originalError;
+                
+                if (errors.length === 0) {
+                    result.innerHTML = `
+                        <div class="test-result success">
+                            ✅ 未检测到JavaScript错误
+                        </div>
+                    `;
+                } else {
+                    let errorHtml = '<div class="test-result error">❌ 检测到JavaScript错误:</div>';
+                    errors.forEach((error, index) => {
+                        errorHtml += `
+                            <div class="test-result error">
+                                <strong>错误 ${index + 1}:</strong><br>
+                                消息: ${error.message}<br>
+                                文件: ${error.source}:${error.line}:${error.column}<br>
+                                堆栈: ${error.stack}
+                            </div>
+                        `;
+                    });
+                    result.innerHTML = errorHtml;
+                }
+            }, 2000);
+        }
+
+        // 检测页面元素
+        function testPageElements() {
+            const result = document.getElementById('elements-result');
+            
+            const elements = {
+                'device-monitor-container': 'device-monitor页面容器',
+                'device-list-panel': '设备列表面板',
+                'device-detail-panel': '设备详情面板',
+                'realtime-metrics': '实时指标区域',
+                'health-score': '健康度评分',
+                'historical-trends': '历史趋势图'
+            };
+            
+            let results = '';
+            
+            for (const [id, description] of Object.entries(elements)) {
+                const element = document.getElementById(id) || document.querySelector(`[class*="${id}"]`);
+                if (element) {
+                    results += `
+                        <div class="test-result success">
+                            ✅ ${description} - 找到元素 (${element.tagName})
+                        </div>
+                    `;
+                } else {
+                    results += `
+                        <div class="test-result error">
+                            ❌ ${description} - 元素不存在或不可见
+                        </div>
+                    `;
+                }
+            }
+            
+            result.innerHTML = results;
+        }
+
+        // 开始性能监控
+        function startPerformanceMonitor() {
+            const result = document.getElementById('performance-result');
+            
+            performanceInterval = setInterval(() => {
+                if ('performance' in window && 'memory' in performance) {
+                    const memInfo = performance.memory;
+                    const memUsed = (memInfo.usedJSHeapSize / 1024 / 1024).toFixed(2);
+                    const memTotal = (memInfo.totalJSHeapSize / 1024 / 1024).toFixed(2);
+                    
+                    result.innerHTML = `
+                        <div class="test-result info">
+                            💾 内存使用: ${memUsed} MB / ${memTotal} MB
+                        </div>
+                    `;
+                } else {
+                    result.innerHTML = `
+                        <div class="test-result info">
+                            📊 性能监控不可用 (需要Chrome浏览器)
+                        </div>
+                    `;
+                }
+            }, 1000);
+        }
+
+        // 停止性能监控
+        function stopPerformanceMonitor() {
+            if (performanceInterval) {
+                clearInterval(performanceInterval);
+                performanceInterval = null;
+                document.getElementById('performance-result').innerHTML = 
+                    '<div class="test-result info">⏹️ 性能监控已停止</div>';
+            }
+        }
+
+        // 初始化显示修复建议
+        function initRepairSuggestions() {
+            const suggestions = `
+                <div class="test-result info">
+                    <h3>🔧 Device Monitor 页面修复建议:</h3>
+                    <ol>
+                        <li><strong>检查路由配置:</strong> 确保 /device-monitor 路由正确指向 DeviceMonitor.vue 组件</li>
+                        <li><strong>检查组件导入:</strong> 验证 DeviceMonitor.vue 的导入路径和依赖项</li>
+                        <li><strong>检查CSS样式:</strong> 确认页面样式正确加载，无样式冲突</li>
+                        <li><strong>检查JavaScript错误:</strong> 在浏览器控制台查看详细错误信息</li>
+                        <li><strong>检查API数据:</strong> 确认后端API接口正常工作并返回数据</li>
+                        <li><strong>检查网络请求:</strong> 在Network面板查看请求状态和响应</li>
+                    </ol>
+                </div>
+            `;
+            document.getElementById('repair-suggestions').innerHTML = suggestions;
+        }
+
+        // 页面加载完成后初始化
+        window.addEventListener('load', () => {
+            initRepairSuggestions();
+            console.log('Device Monitor 调试工具已加载');
+        });
+    </script>
+</body>
+</html>

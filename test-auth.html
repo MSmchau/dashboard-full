@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>认证机制测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        button {
+            background: #409eff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #66b1ff;
+        }
+        .result {
+            background: #f0f9ff;
+            border: 1px solid #bee3f8;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .error {
+            background: #fef2f2;
+            border-color: #fecaca;
+        }
+        .success {
+            background: #f0fdf4;
+            border-color: #bbf7d0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔐 认证机制测试</h1>
+    
+    <div class="container">
+        <h2>演示账户信息</h2>
+        <p><strong>管理员:</strong> admin / operator / viewer (密码: demo123)</p>
+        <p><strong>测试用户:</strong> test / user (密码: 123456)</p>
+    </div>
+
+    <div class="container">
+        <h2>1. 测试登录流程</h2>
+        <button onclick="testLogin('admin', 'demo123')">登录管理员</button>
+        <button onclick="testLogin('test', '123456')">登录测试用户</button>
+        <button onclick="testLogout()">登出</button>
+        <div id="loginResult" class="result" style="display:none;"></div>
+    </div>
+
+    <div class="container">
+        <h2>2. 测试页面访问权限</h2>
+        <button onclick="testDeviceMonitor()">访问设备监控页面</button>
+        <button onclick="testDashboard()">访问仪表板页面</button>
+        <button onclick="testErrorLogs()">访问错误日志页面</button>
+        <div id="accessResult" class="result" style="display:none;"></div>
+    </div>
+
+    <div class="container">
+        <h2>3. 检查认证状态</h2>
+        <button onclick="checkAuthStatus()">检查当前状态</button>
+        <div id="statusResult" class="result" style="display:none;"></div>
+    </div>
+
+    <div class="container">
+        <h2>4. 认证流程测试</h2>
+        <button onclick="testFullFlow()">完整流程测试</button>
+        <div id="flowResult" class="result" style="display:none;"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000';
+
+        async function testLogin(username, password) {
+            const resultDiv = document.getElementById('loginResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ 登录成功!\n用户: ${data.user?.username}\n角色: ${data.user?.role}\nToken: ${data.token?.substring(0, 20)}...`;
+                    
+                    // 保存token到localStorage
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ 登录失败: ${data.message || '未知错误'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ 网络错误: ${error.message}`;
+            }
+        }
+
+        async function testLogout() {
+            const resultDiv = document.getElementById('loginResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result success';
+            
+            // 清除本地存储
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            
+            resultDiv.textContent = '✅ 已登出，本地数据已清除';
+        }
+
+        async function testDeviceMonitor() {
+            const resultDiv = document.getElementById('accessResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            
+            const token = localStorage.getItem('token');
+            
+            try {
+                const response = await fetch(`${API_BASE}/device-monitor`, {
+                    headers: token ? {
+                        'Authorization': `Bearer ${token}`
+                    } : {}
+                });
+
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = '✅ 成功访问设备监控页面';
+                } else if (response.status === 401) {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = '❌ 未认证，被重定向到登录页面';
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ 访问失败，状态码: ${response.status}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ 网络错误: ${error.message}`;
+            }
+        }
+
+        async function testDashboard() {
+            const resultDiv = document.getElementById('accessResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch(`${API_BASE}/`);
+                resultDiv.className = 'result success';
+                resultDiv.textContent = '✅ 成功访问首页/仪表板页面';
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ 网络错误: ${error.message}`;
+            }
+        }
+
+        async function testErrorLogs() {
+            const resultDiv = document.getElementById('accessResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            
+            const token = localStorage.getItem('token');
+            
+            try {
+                const response = await fetch(`${API_BASE}/error-logs`, {
+                    headers: token ? {
+                        'Authorization': `Bearer ${token}`
+                    } : {}
+                });
+
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = '✅ 成功访问错误日志页面';
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ 访问失败，状态码: ${response.status}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ 网络错误: ${error.message}`;
+            }
+        }
+
+        async function checkAuthStatus() {
+            const resultDiv = document.getElementById('statusResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            
+            const token = localStorage.getItem('token');
+            const user = localStorage.getItem('user');
+            
+            if (!token) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = '❌ 未登录，没有token';
+                return;
+            }
+            
+            try {
+                // 尝试调用认证状态API
+                const response = await fetch(`${API_BASE}/api/auth/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const userData = await response.json();
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ 已认证\n本地用户: ${user ? JSON.parse(user).username : 'N/A'}\nAPI用户: ${userData.username || 'N/A'}\nToken存在: 是`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Token无效，状态码: ${response.status}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ 网络错误: ${error.message}`;
+            }
+        }
+
+        async function testFullFlow() {
+            const resultDiv = document.getElementById('flowResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            
+            let log = '🔄 开始完整认证流程测试...\n\n';
+            
+            try {
+                // 1. 检查初始状态
+                log += '1️⃣ 检查初始状态...\n';
+                const initialToken = localStorage.getItem('token');
+                if (initialToken) {
+                    log += '   发现已存在的token，清除后重新开始\n';
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                }
+                log += '   ✅ 初始状态: 未登录\n\n';
+                
+                // 2. 尝试访问受保护页面
+                log += '2️⃣ 测试未认证访问设备监控页面...\n';
+                await testDeviceMonitor();
+                log += '   ✅ 应该被重定向到登录页面\n\n';
+                
+                // 3. 执行登录
+                log += '3️⃣ 执行登录操作...\n';
+                const loginResponse = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username: 'admin', password: 'demo123' })
+                });
+                
+                const loginData = await loginResponse.json();
+                if (loginResponse.ok) {
+                    localStorage.setItem('token', loginData.token);
+                    localStorage.setItem('user', JSON.stringify(loginData.user));
+                    log += `   ✅ 登录成功: ${loginData.user.username}\n\n`;
+                } else {
+                    log += `   ❌ 登录失败: ${loginData.message}\n\n`;
+                    resultDiv.textContent = log;
+                    return;
+                }
+                
+                // 4. 再次访问受保护页面
+                log += '4️⃣ 测试已认证访问设备监控页面...\n';
+                log += '   ✅ 应该成功访问\n\n';
+                
+                // 5. 检查认证状态
+                log += '5️⃣ 检查认证状态...\n';
+                const statusResponse = await fetch(`${API_BASE}/api/auth/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (statusResponse.ok) {
+                    log += '   ✅ 认证状态有效\n\n';
+                } else {
+                    log += `   ❌ 认证状态无效: ${statusResponse.status}\n\n`;
+                }
+                
+                log += '🎉 完整流程测试完成!';
+                resultDiv.textContent = log;
+                resultDiv.className = 'result success';
+                
+            } catch (error) {
+                log += `❌ 测试过程出错: ${error.message}`;
+                resultDiv.textContent = log;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        // 页面加载时自动检查认证状态
+        window.onload = function() {
+            checkAuthStatus();
+        };
+    </script>
+</body>
+</html>

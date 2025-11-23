@@ -1,0 +1,484 @@
+version: '3.8'
+
+networks:
+  device-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres_data:
+    driver: local
+  influxdb_data:
+    driver: local
+  redis_data:
+    driver: local
+  kafka_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+services:
+  # 数据库服务
+  postgresql:
+    image: postgres:15-alpine
+    container_name: device-postgresql
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: device_management
+      POSTGRES_USER: device_admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-device_admin_123}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./config/postgresql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      device-network:
+        ipv4_address: 172.20.0.10
+    command: >
+      postgres 
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c max_connections=500
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+
+  # 时序数据库
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: device-influxdb
+    restart: unless-stopped
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD:-admin_123}
+      DOCKER_INFLUXDB_INIT_ORG: device-org
+      DOCKER_INFLUXDB_INIT_BUCKET: device-metrics
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:-device_admin_token_123}
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    ports:
+      - "8086:8086"
+    networks:
+      device-network:
+        ipv4_address: 172.20.0.11
+
+  # 缓存服务
+  redis:
+    image: redis:7.2-alpine
+    container_name: device-redis
+    restart: unless-stopped
+    command: >
+      redis-server 
+      --appendonly yes 
+      --appendfsync everysec
+      --maxmemory 2gb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      device-network:
+        ipv4_address: 172.20.0.12
+
+  # 消息队列
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: device-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      device-network:
+        ipv4_address: 172.20.0.21
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: device-kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+      KAFKA_NUM_PARTITIONS: 6
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_RETENTION_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_RETENTION_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_RETENTION_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      KAFKA_NUM_PARTITIONS: 6
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      device-network:
+        ipv4_address: 172.20.0.22
+
+  # 服务注册中心
+  eureka-server:
+    build:
+      context: ./services/eureka-server
+      dockerfile: Dockerfile
+    container_name: device-eureka-server
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "8761:8761"
+    networks:
+      device-network:
+        ipv4_address: 172.20.0.30
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # API网关
+  gateway-server:
+    build:
+      context: ./services/gateway-server
+      dockerfile: Dockerfile
+    container_name: device-gateway-server
+    restart: unless-stopped
+    depends_on:
+      - eureka-server
+      - redis
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JAVA_OPTS: "-Xms1g -Xmx1g"
+    ports:
+      - "8080:8080"
+    networks:
+      device-network:
+        ipv4_address: 172.20.0.31
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 设备管理服务
+  device-service:
+    build:
+      context: ./services/device-service
+      dockerfile: Dockerfile
+    container_name: device-device-service
+    restart: unless-stopped
+    depends_on:
+      - eureka-server
+      - postgresql
+      - redis
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      DATABASE_HOST: postgresql
+      DATABASE_PORT: 5432
+      DATABASE_NAME: device_management
+      DATABASE_USERNAME: device_admin
+      DATABASE_PASSWORD: ${DB_PASSWORD:-device_admin_123}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JAVA_OPTS: "-Xms1g -Xmx1g"
+    ports:
+      - "8081:8081"
+    networks:
+      device-network:
+        ipv4_address: 172.20.0.32
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 数据采集服务
+  data-collection-service:
+    build:
+      context: ./services/data-collection-service
+      dockerfile: Dockerfile
+    container_name: device-data-collection-service
+    restart: unless-stopped
+    depends_on:
+      - eureka-server
+      - kafka
+      - influxdb
+      - redis
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      INFLUXDB_HOST: influxdb
+      INFLUXDB_PORT: 8086
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-device_admin_token_123}
+      INFLUXDB_ORG: device-org
+      INFLUXDB_BUCKET: device-metrics
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JAVA_OPTS: "-Xms1g -Xmx2g"
+    ports:
+      - "8083:8083"
+    networks:
+      device-network:
+        ipv4_address: 172.20.0.33
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 监控告警服务
+  monitoring-service:
+    build:
+      context: ./services/monitoring-service
+      dockerfile: Dockerfile
+    container_name: device-monitoring-service
+    restart: unless-stopped
+    depends_on:
+      - eureka-server
+      - postgresql
+      - influxdb
+      - kafka
+      - redis
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      DATABASE_HOST: postgresql
+      DATABASE_PORT: 5432
+      DATABASE_NAME: device_management
+      DATABASE_USERNAME: device_admin
+      DATABASE_PASSWORD: ${DB_PASSWORD:-device_admin_123}
+      INFLUXDB_HOST: influxdb
+      INFLUXDB_PORT: 8086
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-device_admin_token_123}
+      INFLUXDB_ORG: device-org
+      INFLUXDB_BUCKET: device-metrics
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JAVA_OPTS: "-Xms1g -Xmx1g"
+    ports:
+      - "8082:8082"
+    networks:
+      device-network:
+        ipv4_address: 172.20.0.34
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 配置中心服务
+  config-service:
+    build:
+      context: ./services/config-service
+      dockerfile: Dockerfile
+    container_name: device-config-service
+    restart: unless-stopped
+    depends_on:
+      - eureka-server
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "8084:8084"
+    networks:
+      device-network:
+        ipv4_address: 172.20.0.35
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 认证授权服务
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: device-auth-service
+    restart: unless-stopped
+    depends_on:
+      - eureka-server
+      - postgresql
+      - redis
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      DATABASE_HOST: postgresql
+      DATABASE_PORT: 5432
+      DATABASE_NAME: device_management
+      DATABASE_USERNAME: device_admin
+      DATABASE_PASSWORD: ${DB_PASSWORD:-device_admin_123}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "8085:8085"
+    networks:
+      device-network:
+        ipv4_address: 172.20.0.36
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 对象存储
+  minio:
+    image: minio/minio:RELEASE.2023-12-23T07-19-11Z
+    container_name: device-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-admin_123456}
+    command: server /data --console-address ":9001"
+    volumes:
+      - ./data/minio:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      device-network:
+        ipv4_address: 172.20.0.40
+
+  # 监控服务 - Prometheus
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: device-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./config/prometheus/rules:/etc/prometheus/rules
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    networks:
+      device-network:
+        ipv4_address: 172.20.0.50
+
+  # 监控服务 - Grafana
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: device-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin_123}
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3000:3000"
+    networks:
+      device-network:
+        ipv4_address: 172.20.0.51
+
+  # 日志收集 - Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.9.0
+    container_name: device-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms2g -Xmx2g
+      - xpack.security.enabled=false
+    volumes:
+      - ./data/elasticsearch:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      device-network:
+        ipv4_address: 172.20.0.61
+
+  # 日志收集 - Logstash
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.9.0
+    container_name: device-logstash
+    restart: unless-stopped
+    depends_on:
+      - elasticsearch
+    volumes:
+      - ./config/logstash/logstash.yml:/usr/share/logstash/config/logstash.yml
+      - ./config/logstash/pipeline:/usr/share/logstash/pipeline
+      - /var/log/device:/var/log/device
+    environment:
+      LS_JAVA_OPTS: "-Xms1g -Xmx1g"
+    ports:
+      - "5044:5044"
+    networks:
+      device-network:
+        ipv4_address: 172.20.0.62
+
+  # 日志收集 - Kibana
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.9.0
+    container_name: device-kibana
+    restart: unless-stopped
+    depends_on:
+      - elasticsearch
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    networks:
+      device-network:
+        ipv4_address: 172.20.0.63
+
+  # 负载均衡 - Nginx
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: device-nginx
+    restart: unless-stopped
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./config/nginx/conf.d:/etc/nginx/conf.d
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      device-network:
+        ipv4_address: 172.20.0.70

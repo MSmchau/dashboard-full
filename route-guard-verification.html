@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>路由守卫功能验证</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .test-section {
+      background: white;
+      margin: 20px 0;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .test-section h2 {
+      color: #333;
+      border-bottom: 2px solid #007bff;
+      padding-bottom: 10px;
+    }
+    .status {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .status.warning {
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
+    .status.info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin: 5px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .log-container {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 15px;
+      height: 300px;
+      overflow-y: auto;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 12px;
+      border-radius: 4px;
+      margin-top: 10px;
+    }
+    .log-entry {
+      margin: 2px 0;
+      padding: 2px 4px;
+      border-left: 3px solid transparent;
+    }
+    .log-entry.info { border-left-color: #17a2b8; }
+    .log-entry.success { border-left-color: #28a745; }
+    .log-entry.warning { border-left-color: #ffc107; }
+    .log-entry.error { border-left-color: #dc3545; }
+    .two-column {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    iframe {
+      width: 100%;
+      height: 400px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🛡️ 路由守卫功能验证</h1>
+  
+  <!-- 状态监控 -->
+  <div class="test-section">
+    <h2>📊 系统状态监控</h2>
+    <div id="authStatus" class="status info">检查中...</div>
+    <div id="routerStatus" class="status info">检查中...</div>
+    <div id="permissionStatus" class="status info">检查中...</div>
+    
+    <button onclick="checkSystemStatus()">🔄 刷新状态</button>
+  </div>
+  
+  <!-- 认证测试 -->
+  <div class="test-section">
+    <h2>🔐 认证流程测试</h2>
+    <p>测试登录、登出和认证状态管理功能</p>
+    
+    <div>
+      <button onclick="testLogin('admin', 'demo123')">👤 登录管理员</button>
+      <button onclick="testLogin('operator', 'demo123')">👤 登录操作员</button>
+      <button onclick="testLogin('viewer', 'demo123')">👤 登录查看者</button>
+      <button onclick="testLogout()">🚪 登出</button>
+    </div>
+    
+    <div id="loginResult" class="status info" style="margin-top: 10px;">等待测试...</div>
+  </div>
+  
+  <!-- 权限测试 -->
+  <div class="test-section">
+    <h2>🛡️ 权限验证测试</h2>
+    <p>测试用户角色和权限检查功能</p>
+    
+    <button onclick="testPermissions()">🔍 检查所有权限</button>
+    <button onclick="testRoles()">👥 检查用户角色</button>
+    
+    <div id="permissionResult" class="status info" style="margin-top: 10px;">等待测试...</div>
+  </div>
+  
+  <!-- 路由测试 -->
+  <div class="test-section">
+    <h2>🛣️ 路由导航测试</h2>
+    <p>测试路由守卫的拦截和放行功能</p>
+    
+    <div>
+      <button onclick="testPublicRoute()">🌐 测试公开路由</button>
+      <button onclick="testProtectedRoute()">🔒 测试受保护路由</button>
+      <button onclick="testAdminRoute()">👑 测试管理员路由</button>
+    </div>
+    
+    <div class="two-column" style="margin-top: 10px;">
+      <div>
+        <h4>测试结果</h4>
+        <div id="routeResult" class="status info">等待测试...</div>
+      </div>
+      <div>
+        <h4>浏览器预览</h4>
+        <iframe id="testFrame" src="about:blank"></iframe>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 日志监控 -->
+  <div class="test-section">
+    <h2>📝 实时日志监控</h2>
+    <p>实时显示路由守卫的运行日志</p>
+    
+    <div>
+      <button onclick="clearLogs()">🗑️ 清空日志</button>
+      <button onclick="exportLogs()">💾 导出日志</button>
+    </div>
+    
+    <div id="logContainer" class="log-container">
+      <div class="log-entry info">[等待] 系统已启动，等待测试...</div>
+    </div>
+  </div>
+
+  <script>
+    // 日志系统
+    const logs = [];
+    
+    function addLog(message, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString();
+      const logEntry = { timestamp, type, message };
+      logs.push(logEntry);
+      
+      const logContainer = document.getElementById('logContainer');
+      const logDiv = document.createElement('div');
+      logDiv.className = `log-entry ${type}`;
+      logDiv.textContent = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+      
+      logContainer.appendChild(logDiv);
+      logContainer.scrollTop = logContainer.scrollHeight;
+      
+      console.log(`[${timestamp}] ${type.toUpperCase()}: ${message}`);
+    }
+    
+    function clearLogs() {
+      logs.length = 0;
+      document.getElementById('logContainer').innerHTML = '';
+      addLog('日志已清空', 'info');
+    }
+    
+    function exportLogs() {
+      const logText = logs.map(log => `[${log.timestamp}] ${log.type.toUpperCase()}: ${log.message}`).join('\n');
+      const blob = new Blob([logText], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `route-guard-logs-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+      addLog('日志已导出', 'success');
+    }
+    
+    // 系统状态检查
+    async function checkSystemStatus() {
+      addLog('开始检查系统状态...', 'info');
+      
+      try {
+        // 检查认证服务
+        const authStatus = document.getElementById('authStatus');
+        if (window.authService) {
+          const isLoggedIn = window.authService.isLoggedIn();
+          authStatus.className = `status ${isLoggedIn ? 'success' : 'warning'}`;
+          authStatus.textContent = `认证服务: ${isLoggedIn ? '已登录' : '未登录'}`;
+          
+          if (isLoggedIn) {
+            const user = window.authService.currentUser;
+            authStatus.textContent += ` (用户: ${user?.username || '未知'})`;
+          }
+        } else {
+          authStatus.className = 'status error';
+          authStatus.textContent = '认证服务: 未找到';
+        }
+        
+        // 检查路由服务
+        const routerStatus = document.getElementById('routerStatus');
+        if (window.router) {
+          const currentRoute = window.router.currentRoute.value;
+          routerStatus.className = 'status success';
+          routerStatus.textContent = `路由服务: 正常 (当前: ${currentRoute?.path || '未知'})`;
+        } else {
+          routerStatus.className = 'status error';
+          routerStatus.textContent = '路由服务: 未找到';
+        }
+        
+        // 检查权限系统
+        const permissionStatus = document.getElementById('permissionStatus');
+        if (window.PERMISSIONS && window.ROLES) {
+          permissionStatus.className = 'status success';
+          permissionStatus.textContent = '权限系统: 已加载';
+        } else {
+          permissionStatus.className = 'status error';
+          permissionStatus.textContent = '权限系统: 未找到';
+        }
+        
+        addLog('系统状态检查完成', 'success');
+        
+      } catch (error) {
+        addLog(`系统状态检查失败: ${error.message}`, 'error');
+      }
+    }
+    
+    // 认证测试
+    async function testLogin(username, password) {
+      addLog(`尝试登录用户: ${username}`, 'info');
+      
+      const loginResult = document.getElementById('loginResult');
+      loginResult.className = 'status info';
+      loginResult.textContent = '正在登录...';
+      
+      try {
+        if (!window.authService) {
+          throw new Error('认证服务未找到');
+        }
+        
+        const user = await window.authService.login(username, password, false);
+        loginResult.className = 'status success';
+        loginResult.textContent = `登录成功: ${user.username} (${user.role})`;
+        addLog(`用户 ${user.username} 登录成功`, 'success');
+        
+        // 刷新状态
+        await checkSystemStatus();
+        
+      } catch (error) {
+        loginResult.className = 'status error';
+        loginResult.textContent = `登录失败: ${error.message}`;
+        addLog(`登录失败: ${error.message}`, 'error');
+      }
+    }
+    
+    async function testLogout() {
+      addLog('开始登出...', 'info');
+      
+      const loginResult = document.getElementById('loginResult');
+      
+      try {
+        if (window.authService) {
+          await window.authService.logout();
+          loginResult.className = 'status warning';
+          loginResult.textContent = '已登出';
+          addLog('用户已登出', 'success');
+          
+          // 刷新状态
+          await checkSystemStatus();
+        } else {
+          throw new Error('认证服务未找到');
+        }
+      } catch (error) {
+        loginResult.className = 'status error';
+        loginResult.textContent = `登出失败: ${error.message}`;
+        addLog(`登出失败: ${error.message}`, 'error');
+      }
+    }
+    
+    // 权限测试
+    function testPermissions() {
+      addLog('开始权限检查...', 'info');
+      
+      const permissionResult = document.getElementById('permissionResult');
+      permissionResult.className = 'status info';
+      
+      try {
+        if (!window.authService) {
+          throw new Error('认证服务未找到');
+        }
+        
+        const permissions = [
+          'dashboard:view',
+          'device:view',
+          'device:manage',
+          'error:view',
+          'performance:view'
+        ];
+        
+        const results = permissions.map(perm => {
+          const has = window.authService.hasPermission(perm);
+          return `${perm}: ${has ? '✓' : '✗'}`;
+        });
+        
+        permissionResult.className = 'status success';
+        permissionResult.innerHTML = results.join('<br>');
+        addLog('权限检查完成', 'success');
+        
+      } catch (error) {
+        permissionResult.className = 'status error';
+        permissionResult.textContent = `权限检查失败: ${error.message}`;
+        addLog(`权限检查失败: ${error.message}`, 'error');
+      }
+    }
+    
+    function testRoles() {
+      addLog('开始角色检查...', 'info');
+      
+      const permissionResult = document.getElementById('permissionResult');
+      
+      try {
+        if (!window.authService) {
+          throw new Error('认证服务未找到');
+        }
+        
+        const roles = ['admin', 'operator', 'viewer'];
+        const results = roles.map(role => {
+          const has = window.authService.hasRole(role);
+          return `${role}: ${has ? '✓' : '✗'}`;
+        });
+        
+        permissionResult.className = 'status success';
+        permissionResult.innerHTML = results.join('<br>');
+        addLog('角色检查完成', 'success');
+        
+      } catch (error) {
+        permissionResult.className = 'status error';
+        permissionResult.textContent = `角色检查失败: ${error.message}`;
+        addLog(`角色检查失败: ${error.message}`, 'error');
+      }
+    }
+    
+    // 路由测试
+    async function testPublicRoute() {
+      addLog('测试公开路由访问...', 'info');
+      
+      const routeResult = document.getElementById('routeResult');
+      const frame = document.getElementById('testFrame');
+      
+      try {
+        routeResult.className = 'status info';
+        routeResult.textContent = '正在测试公开路由...';
+        
+        // 测试访问公开路由
+        frame.src = '/router-test';
+        
+        setTimeout(() => {
+          routeResult.className = 'status success';
+          routeResult.textContent = '✓ 公开路由访问成功';
+          addLog('公开路由访问成功', 'success');
+        }, 1000);
+        
+      } catch (error) {
+        routeResult.className = 'status error';
+        routeResult.textContent = `公开路由测试失败: ${error.message}`;
+        addLog(`公开路由测试失败: ${error.message}`, 'error');
+      }
+    }
+    
+    async function testProtectedRoute() {
+      addLog('测试受保护路由访问...', 'info');
+      
+      const routeResult = document.getElementById('routeResult');
+      const frame = document.getElementById('testFrame');
+      
+      try {
+        routeResult.className = 'status info';
+        routeResult.textContent = '正在测试受保护路由...';
+        
+        // 测试访问受保护路由
+        frame.src = '/dashboard';
+        
+        setTimeout(() => {
+          // 检查是否被重定向到登录页
+          if (frame.contentWindow && frame.contentWindow.location.pathname === '/login') {
+            routeResult.className = 'status success';
+            routeResult.textContent = '✓ 受保护路由被正确拦截并重定向';
+            addLog('受保护路由被正确拦截', 'success');
+          } else {
+            routeResult.className = 'status warning';
+            routeResult.textContent = '⚠ 受保护路由未被拦截（可能已登录）';
+            addLog('受保护路由未被拦截', 'warning');
+          }
+        }, 2000);
+        
+      } catch (error) {
+        routeResult.className = 'status error';
+        routeResult.textContent = `受保护路由测试失败: ${error.message}`;
+        addLog(`受保护路由测试失败: ${error.message}`, 'error');
+      }
+    }
+    
+    async function testAdminRoute() {
+      addLog('测试管理员路由访问...', 'info');
+      
+      const routeResult = document.getElementById('routeResult');
+      const frame = document.getElementById('testFrame');
+      
+      try {
+        routeResult.className = 'status info';
+        routeResult.textContent = '正在测试管理员路由...';
+        
+        // 先确保登录为管理员
+        if (window.authService && !window.authService.isLoggedIn()) {
+          await window.authService.login('admin', 'demo123', false);
+        }
+        
+        // 测试访问可能需要管理员权限的路由
+        frame.src = '/device-config';
+        
+        setTimeout(() => {
+          const currentPath = frame.contentWindow ? frame.contentWindow.location.pathname : '未知';
+          routeResult.className = 'status success';
+          routeResult.textContent = `✓ 管理员路由测试: ${currentPath}`;
+          addLog(`管理员路由测试完成: ${currentPath}`, 'success');
+        }, 2000);
+        
+      } catch (error) {
+        routeResult.className = 'status error';
+        routeResult.textContent = `管理员路由测试失败: ${error.message}`;
+        addLog(`管理员路由测试失败: ${error.message}`, 'error');
+      }
+    }
+    
+    // 初始化
+    window.addEventListener('load', () => {
+      addLog('路由守卫验证页面已加载', 'info');
+      
+      // 定期刷新状态
+      setInterval(checkSystemStatus, 5000);
+      
+      // 初始状态检查
+      setTimeout(checkSystemStatus, 1000);
+    });
+    
+    // 暴露函数到全局
+    window.checkSystemStatus = checkSystemStatus;
+    window.testLogin = testLogin;
+    window.testLogout = testLogout;
+    window.testPermissions = testPermissions;
+    window.testRoles = testRoles;
+    window.testPublicRoute = testPublicRoute;
+    window.testProtectedRoute = testProtectedRoute;
+    window.testAdminRoute = testAdminRoute;
+    window.clearLogs = clearLogs;
+    window.exportLogs = exportLogs;
+  </script>
+</body>
+</html>

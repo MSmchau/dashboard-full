@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录流程测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background: #f0f9ff;
+            color: #065f46;
+            border: 1px solid #10b981;
+        }
+        .error {
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #ef4444;
+        }
+        .info {
+            background: #f0f9ff;
+            color: #1e40af;
+            border: 1px solid #3b82f6;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+        }
+        .demo-accounts {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>登录流程测试</h1>
+    
+    <div class="test-container">
+        <h2>认证服务测试</h2>
+        <div class="demo-accounts">
+            <h3>演示账户：</h3>
+            <p><strong>admin</strong> / demo123 (管理员权限)</p>
+            <p><strong>operator</strong> / demo123 (操作员权限)</p>
+            <p><strong>viewer</strong> / demo123 (查看者权限)</p>
+            <p><strong>test</strong> / 123456 (测试账户)</p>
+            <p><strong>user</strong> / 123456 (普通用户)</p>
+        </div>
+        
+        <div>
+            <input type="text" id="username" placeholder="用户名或邮箱" value="admin">
+            <input type="password" id="password" placeholder="密码" value="demo123">
+            <button onclick="testLogin()">测试登录</button>
+            <button onclick="testDeviceMonitor()">测试设备监控页面</button>
+            <button onclick="checkAuthState()">检查认证状态</button>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>测试结果</h2>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:3001';
+        
+        function addResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}:</strong> ${message}`;
+            results.appendChild(div);
+        }
+
+        async function testLogin() {
+            addResult('开始测试登录流程...', 'info');
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                // 1. 首先确保没有登录状态
+                const logoutResponse = await fetch(`${BASE_URL}/api/auth/logout`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                addResult('清除现有登录状态', 'info');
+                
+                // 2. 尝试登录
+                const loginResponse = await fetch(`${BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        username: username,
+                        password: password,
+                        remember: false
+                    })
+                });
+                
+                if (loginResponse.ok) {
+                    const userData = await loginResponse.json();
+                    addResult(`✅ 登录成功: ${userData.username} (${userData.role})`, 'success');
+                    addResult(`权限数量: ${userData.permissions ? userData.permissions.length : 0}`, 'info');
+                } else {
+                    const error = await loginResponse.json();
+                    addResult(`❌ 登录失败: ${error.message || '未知错误'}`, 'error');
+                }
+                
+            } catch (error) {
+                addResult(`❌ 网络错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testDeviceMonitor() {
+            addResult('测试访问设备监控页面...', 'info');
+            
+            try {
+                const response = await fetch(`${BASE_URL}/device-monitor`, {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    addResult('✅ 设备监控页面访问成功', 'success');
+                    addResult(`状态码: ${response.status}`, 'info');
+                } else {
+                    addResult(`❌ 设备监控页面访问失败: ${response.status}`, 'error');
+                    if (response.status === 302 || response.status === 401) {
+                        addResult('页面重定向到登录，说明认证机制正常工作', 'info');
+                    }
+                }
+            } catch (error) {
+                addResult(`❌ 网络错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkAuthState() {
+            addResult('检查当前认证状态...', 'info');
+            
+            try {
+                const response = await fetch(`${BASE_URL}/api/auth/me`, {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const userData = await response.json();
+                    addResult(`✅ 已登录: ${userData.username} (${userData.role})`, 'success');
+                } else {
+                    addResult('❌ 未登录或登录已过期', 'error');
+                }
+            } catch (error) {
+                addResult(`❌ 网络错误: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时检查认证状态
+        window.onload = function() {
+            addResult('登录流程测试页面已加载', 'info');
+            checkAuthState();
+        };
+    </script>
+</body>
+</html>
